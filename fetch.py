@@ -10,6 +10,32 @@ def parse_source(html, encoding='utf-8'):
     return parsed
 
 
+def fetch_pap():
+    base = 'http://www.pap.fr/annonce/locations-appartement-paris-14e-g37781'
+    resp = requests.get(base, timeout=10)
+    resp.raise_for_status()  # <- no-op if status==200
+    resp_comb = resp.content
+    for i in [13, 15]:
+        print(i)
+        base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}e-g37781'.format(i)
+        resp_ = requests.get(base2, timeout=10)
+        # resp_.raise_for_status()  # <- no-op if status==200
+        if resp_.status_code == 404:
+            break
+        resp_comb += resp_.content + resp_comb
+
+        for j in np.arange(1, 12):
+            print(j)
+            base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}e-g37781-{}'.format(i, j)
+            resp_ = requests.get(base2, timeout=10)
+            # resp_.raise_for_status()  # <- no-op if status==200
+            if resp_.status_code == 404:
+                break
+            resp_comb += resp_.content + resp_comb
+
+    return resp_comb, resp.encoding
+
+
 def fetch_fusac():
     base = 'http://ads.fusac.fr/ad-category/housing/'
     resp = requests.get(base, timeout=10)

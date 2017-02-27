@@ -23,7 +23,7 @@ def fetch_pap():
         # resp_.raise_for_status()  # <- no-op if status==200
         if resp_.status_code == 404:
             break
-        parsed = parse_source(resp_.content , resp_.encoding)
+        parsed = parse_source(resp_.content, resp_.encoding)
         listing = extract_listings_pap(parsed)
         print(listing)
         resp_comb += resp_.content + resp_comb
@@ -151,6 +151,16 @@ def extract_listings_pap(parsed):
         if price is not None:
             price = float(price.string.split()[0].replace('.', ''))
 
+        ref = listing.find('div', {'class': 'float-right'}).find('a', href=True)['href']
+        base = 'http://www.pap.fr/' + ref
+        resp = requests.get(base, timeout=10)
+        resp.raise_for_status()  # <- no-op if status==200
+        resp_comb = parse_source(resp.content, resp.encoding)
+        pieces =resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong')[0]
+        chambre =resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong')[1]
+        print(resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong')[2].string.string)
+        meters = resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong').string.split()[0]
+
         # link = listing.find('div', {'class': 'listos'}).find('a',href=True)['href']
 
         # resp = requests.get(link, timeout=10)
@@ -186,6 +196,7 @@ def extract_listings_pap(parsed):
 
 # parsed.find_all(
 #     ...:         'div', {'class': "box search-results-item"})[0].find('div',{'class':'float-right'}).find('a',href=True)['href']
+
 
 def extract_listings(parsed):
     # location_attrs = {'data-latitude': True, 'data-longitude': True}

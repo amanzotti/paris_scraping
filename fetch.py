@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import sys
 import numpy as np
 # then add this function lower down
+from memory_profiler import profile
 
 
 def parse_source(html, encoding='utf-8'):
@@ -15,18 +16,22 @@ def fetch_pap():
     resp = requests.get(base, timeout=10)
     resp.raise_for_status()  # <- no-op if status==200
     resp_comb = resp.content
-    for i in [13, 15]:
+    for i in [13, 14]:
         print(i)
         base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}e-g37781'.format(i)
         resp_ = requests.get(base2, timeout=10)
         # resp_.raise_for_status()  # <- no-op if status==200
         if resp_.status_code == 404:
             break
+        parsed = parse_source(resp_.content , resp_.encoding)
+        listing = extract_listings_pap(parsed)
+        print(listing)
         resp_comb += resp_.content + resp_comb
 
-        for j in np.arange(1, 12):
+        for j in np.arange(1, 2):
             print(j)
-            base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}e-g37781-{}'.format(i, j)
+            base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}e-g37781-{}'.format(
+                i, j)
             resp_ = requests.get(base2, timeout=10)
             # resp_.raise_for_status()  # <- no-op if status==200
             if resp_.status_code == 404:
@@ -127,6 +132,61 @@ def extract_listings_fusac(parsed):
     return extracted
 
 
+def extract_listings_pap(parsed):
+    # location_attrs = {'data-latitude': True, 'data-longitude': True}
+    listings = parsed.find_all(
+        'div', {'class': "box search-results-item"})
+    extracted = []
+
+    for listing in listings[0:]:
+        # hood = listing.find('span', {'class': 'result-hood'})
+        # # print(hood)
+        # # location = {key: listing.attrs.get(key, '') for key in location_attrs}
+        # link = listing.find('a', {'class': 'result-title hdrlnk'})  # add this
+        # if link is not None:
+        #     descr = link.string.strip()
+        #     link_href = link.attrs['href']
+
+        price = listing.find('span', {'class': 'price'})
+        if price is not None:
+            price = float(price.string.split()[0].replace('.', ''))
+
+        # link = listing.find('div', {'class': 'listos'}).find('a',href=True)['href']
+
+        # resp = requests.get(link, timeout=10)
+        # resp.raise_for_status()  # <- no-op if status==200
+
+        # desc = listing.find('p', {'class': 'post-desc'}
+        #                     )
+        # if price is not None:
+        #     desc = desc.string
+
+        # housing = listing.find('span', {'class': 'housing'})
+        # if housing is not None:
+        #     beds = housing.decode_contents().split('br')[0][-1]
+        #     rm = housing.decode_contents().split('m<sup>2</sup>')[0]
+        #     sqm = [int(s) for s in rm.split() if s.isdigit()]
+        #     if len(sqm) == 0:
+        #         sqm = None
+        #     else:
+        #         sqm = int(sqm[0])
+
+        this_listing = {
+            # 'location': location,
+            # 'link': link_href,                    # add this too
+            # 'description': descr,            # and this
+            'price': price,
+            # 'description': desc,
+
+            # 'meters': sqm,
+            # 'beds': beds
+        }
+        extracted.append(this_listing)
+    return extracted
+
+# parsed.find_all(
+#     ...:         'div', {'class': "box search-results-item"})[0].find('div',{'class':'float-right'}).find('a',href=True)['href']
+
 def extract_listings(parsed):
     # location_attrs = {'data-latitude': True, 'data-longitude': True}
     listings = parsed.find_all("li", {"class": "result-row"})
@@ -176,4 +236,4 @@ if __name__ == '__main__':
             minAsk=500, maxAsk=1400, bedrooms=1
         )
     doc = parse_source(html, encoding)
-    print doc.prettify(encoding=encoding)
+    print(doc.prettify(encoding=encoding))

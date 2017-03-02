@@ -13,39 +13,60 @@ def parse_source(html, encoding='utf-8'):
 
 def fetch_pap():
     base = 'http://www.pap.fr/annonce/locations-appartement-paris-14e-g37781'
-    resp = requests.get(base, timeout=10)
+    resp = requests.get(base, timeout=15)
     resp.raise_for_status()  # <- no-op if status==200
     resp_comb = resp.content
-    for i in [13, 14]:
+    listing = []
+    string = {}
+    string[15] = '15e-g37782'
+    string[13] = '13e-g37780'
+    string[14] = '14e-g37781'
+
+    for i in [13, 14, 15]:
         print(i)
-        base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}e-g37781'.format(i)
-        resp_ = requests.get(base2, timeout=10)
+        base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}'.format(string[i])
+        try:
+            resp_ = requests.get(base2, timeout=15)
+        except:
+            break
         # resp_.raise_for_status()  # <- no-op if status==200
         if resp_.status_code == 404:
             break
         parsed = parse_source(resp_.content, resp_.encoding)
-        listing = extract_listings_pap(parsed)
-        print(listing)
-        resp_comb += resp_.content + resp_comb
+        listing.append(extract_listings_pap(parsed))
+        # print(listing)
 
-        for j in np.arange(1, 2):
+        # resp_comb += resp_.content + resp_comb
+
+        for j in np.arange(1, 8):
             print(j)
-            base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}e-g37781-{}'.format(
-                i, j)
-            resp_ = requests.get(base2, timeout=10)
+            base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}-{}'.format(
+                string[i], j)
+            try:
+
+                resp_ = requests.get(base2, timeout=10)
+            except:
+                break
             # resp_.raise_for_status()  # <- no-op if status==200
             if resp_.status_code == 404:
                 break
-            resp_comb += resp_.content + resp_comb
+            # resp_comb += resp_.content + resp_comb
+            parsed = parse_source(resp_.content, resp_.encoding)
+            listing.append(extract_listings_pap(parsed))
 
-    return resp_comb, resp.encoding
+    # return resp_comb, resp.encoding
+    return listing
 
 
 def fetch_fusac():
     base = 'http://ads.fusac.fr/ad-category/housing/'
+    listing = []
     resp = requests.get(base, timeout=10)
     resp.raise_for_status()  # <- no-op if status==200
     resp_comb = resp.content
+    parsed = parse_source(resp.content, resp.encoding)
+    listing.append(extract_listings_fusac(parsed))
+
     for i in np.arange(0, 6):
         print(i)
         base2 = 'http://ads.fusac.fr/ad-category/housing/page/{}/'.format(i)
@@ -54,8 +75,10 @@ def fetch_fusac():
         if resp_.status_code == 404:
             break
         resp_comb += resp_.content + resp_comb
-    return resp_comb, resp.encoding
-
+        parsed = parse_source(resp_.content, resp_.encoding)
+        listing.append(extract_listings_fusac(parsed))
+    # return resp_comb, resp.encoding
+    return listing
 # handle response 200
 
 
@@ -155,11 +178,36 @@ def extract_listings_pap(parsed):
         base = 'http://www.pap.fr/' + ref
         resp = requests.get(base, timeout=10)
         resp.raise_for_status()  # <- no-op if status==200
+
         resp_comb = parse_source(resp.content, resp.encoding)
-        pieces =resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong')[0]
-        chambre =resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong')[1]
-        print(resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong')[2].string.string)
-        meters = resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('strong').string.split()[0]
+        descr = resp_comb.find_all('p', {'class': 'item-description'})[0]
+        try:
+            ars = int(resp_comb.find(
+                'div', {'class': 'item-geoloc'}).find('h2').string.split('e')[0][-2:])
+        except:
+            break
+            pieces = None
+            chambre = None
+            square_meters = None
+
+        try:
+            pieces = int(resp_comb.find_all(
+                'ul', {'class': 'item-summary'})[0].find_all('strong')[0].string)
+        except:
+            pieces = None
+        try:
+            chambre = int(resp_comb.find_all(
+                'ul', {'class': 'item-summary'})[0].find_all('strong')[1].string)
+        except:
+            chambre = None
+        try:
+            square_meters = int(resp_comb.find_all(
+                'ul', {'class': 'item-summary'})[0].find_all('strong')[2].string.split()[0])
+        except:
+            square_meters = None
+
+        # meters = resp_comb.find_all('ul', {'class': 'item-summary'}
+        #                             )[0].find_all('strong').string.split()[0]
 
         # link = listing.find('div', {'class': 'listos'}).find('a',href=True)['href']
 
@@ -186,8 +234,11 @@ def extract_listings_pap(parsed):
             # 'link': link_href,                    # add this too
             # 'description': descr,            # and this
             'price': price,
-            # 'description': desc,
-
+            # 'description': descr,
+            'pieces': pieces,
+            'meters': square_meters,
+            'chambre': chambre,
+            'ars': ars
             # 'meters': sqm,
             # 'beds': beds
         }

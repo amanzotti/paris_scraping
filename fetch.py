@@ -4,6 +4,9 @@ import sys
 import numpy as np
 # then add this function lower down
 from memory_profiler import profile
+import pandas as pd
+from sortedcontainers import SortedDict
+import datetime
 
 
 def parse_source(html, encoding='utf-8'):
@@ -38,7 +41,7 @@ def fetch_pap():
 
         # resp_comb += resp_.content + resp_comb
 
-        for j in np.arange(1, 8):
+        for j in np.arange(1, 7):
             print(j)
             base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}-{}'.format(
                 string[i], j)
@@ -86,6 +89,8 @@ def fetch_search_results(
     query=None, minAsk=600, maxAsk=1450, bedrooms=None, bundleDuplicates=1,
     pets_cat=1
 ):
+
+    listing = []
     search_params = {
         key: val for key, val in locals().items() if val is not None
     }
@@ -93,15 +98,16 @@ def fetch_search_results(
         raise ValueError("No valid keywords")
 
     base = 'https://paris.craigslist.fr/search/apa'
-    resp = requests.get(base, params=search_params, timeout=3)
-    resp.raise_for_status()  # <- no-op if status==200
-    return resp.content, resp.encoding
+    resp_ = requests.get(base, params=search_params, timeout=3)
+    resp_.raise_for_status()  # <- no-op if status==200
+    parsed = parse_source(resp_.content, resp_.encoding)
+    listing.append(extract_listings(parsed))
+    return listing
 
 
 # def extract_listings(parsed):
 #     listings = parsed.find_all("li", {"class": "result-row"})
 #     return listings
-
 def extract_listings_fusac(parsed):
     # location_attrs = {'data-latitude': True, 'data-longitude': True}
     listings = parsed.find_all(
@@ -144,14 +150,20 @@ def extract_listings_fusac(parsed):
         this_listing = {
             # 'location': location,
             # 'link': link_href,                    # add this too
-            # 'description': descr,            # and this
             'price': price,
-            'description': desc,
+            'desc': desc,
 
-            # 'meters': sqm,
-            # 'beds': beds
+
+            # ====
+
+            # 'description': descr,
+            'pieces': None,
+            'meters': None,
+            'chambre': None,
+            'ars': None,
+            'link': None
         }
-        extracted.append(this_listing)
+        extracted.append(SortedDict(this_listing))
     return extracted
 
 
@@ -234,15 +246,16 @@ def extract_listings_pap(parsed):
             # 'link': link_href,                    # add this too
             # 'description': descr,            # and this
             'price': price,
-            # 'description': descr,
+            'desc': None,
             'pieces': pieces,
             'meters': square_meters,
             'chambre': chambre,
-            'ars': ars
+            'ars': ars,
             # 'meters': sqm,
             # 'beds': beds
+            'link': None
         }
-        extracted.append(this_listing)
+        extracted.append(SortedDict(this_listing))
     return extracted
 
 # parsed.find_all(
@@ -281,21 +294,31 @@ def extract_listings(parsed):
         this_listing = {
             # 'location': location,
             'link': link_href,                    # add this too
-            'description': descr,            # and this
+            'desc': descr,            # and this
             'price': price,
             'meters': sqm,
-            'beds': beds
+            'chambre': beds,
+            'pieces': None,
+            'ars': None
         }
-        extracted.append(this_listing)
+        extracted.append(SortedDict(this_listing))
     return extracted
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == 'test':
-        html, encoding = read_search_results()
-    else:
-        html, encoding = fetch_search_results(
-            minAsk=500, maxAsk=1400, bedrooms=1
-        )
-    doc = parse_source(html, encoding)
-    print(doc.prettify(encoding=encoding))
+    # df = pd.read_pickle('./ipapartment_paris.pk')
+    df = pd.DataFrame
+    resu = []
+    print('loading fusac')
+    resu.append(fetch_fusac())
+    print('loading pap')
+    resu.append(fetch_pap())
+    print('loading craig')
+    resu.append(fetch_search_results())
+    flat = [item for lis in resu for lis1 in lis for item in lis1]
+    df_new = pd.DataFrame(flat)
+    print('saving..')
+    # df_new.to_pickle('./apartment_paris_{}.pk'.format(str(datetime.datetime.now())))
+    # df = pd.concat([df, df_new])
+    df_new.to_pickle('./apartment_paris.pk')
+    print('Done.')

@@ -7,6 +7,7 @@ from memory_profiler import profile
 import pandas as pd
 from sortedcontainers import SortedDict
 import datetime
+import bs4
 
 
 def parse_source(html, encoding='utf-8'):
@@ -70,14 +71,13 @@ def fetch_fusac():
     parsed = parse_source(resp.content, resp.encoding)
     listing.append(extract_listings_fusac(parsed))
 
-    for i in np.arange(0, 6):
-        print(i)
-        base2 = 'http://ads.fusac.fr/ad-category/housing/page/{}/'.format(i)
+    for i in np.arange(2, 6):
+        base2 = 'http://ads.fusac.fr/ad-category/housing/housing-offers/page/{}/'.format(i)
         resp_ = requests.get(base2, timeout=10)
         # resp_.raise_for_status()  # <- no-op if status==200
         if resp_.status_code == 404:
             break
-        resp_comb += resp_.content + resp_comb
+        # resp_comb += resp_.content + resp_comb
         parsed = parse_source(resp_.content, resp_.encoding)
         listing.append(extract_listings_fusac(parsed))
     # return resp_comb, resp.encoding
@@ -114,7 +114,7 @@ def extract_listings_fusac(parsed):
         'div', {'class': "prod-cnt prod-box shadow Just-listed"})
     extracted = []
 
-    for listing in listings[0:]:
+    for j, listing in enumerate(listings[0:]):
         # hood = listing.find('span', {'class': 'result-hood'})
         # # print(hood)
         # # location = {key: listing.attrs.get(key, '') for key in location_attrs}
@@ -137,15 +137,16 @@ def extract_listings_fusac(parsed):
         if price is not None:
             desc = desc.string
 
-        # housing = listing.find('span', {'class': 'housing'})
-        # if housing is not None:
-        #     beds = housing.decode_contents().split('br')[0][-1]
-        #     rm = housing.decode_contents().split('m<sup>2</sup>')[0]
-        #     sqm = [int(s) for s in rm.split() if s.isdigit()]
-        #     if len(sqm) == 0:
-        #         sqm = None
-        #     else:
-        #         sqm = int(sqm[0])
+        url = listing.find('div', {'class': "post-left"}).find('div', {'class': "grido"}).find('a', href=True).get('href')
+        resp = requests.get(url, timeout=20)
+        resp.raise_for_status()  # <- no-op if status==200
+
+        parse = parse_source(resp.content, resp.encoding)
+
+        try:
+            ars = int(parse.find('div', {'class': "single-main"}).find('li', {'class': "acf-details-item"}, id="acf-cp_zipcode").find('span', {'class': 'acf-details-val'}).string[-2:])
+        except:
+            ars = None
 
         this_listing = {
             # 'location': location,
@@ -160,7 +161,7 @@ def extract_listings_fusac(parsed):
             'pieces': None,
             'meters': None,
             'chambre': None,
-            'ars': None,
+            'ars': ars,
             'link': None
         }
         extracted.append(SortedDict(this_listing))
@@ -193,28 +194,40 @@ def extract_listings_pap(parsed):
 
         resp_comb = parse_source(resp.content, resp.encoding)
         descr = resp_comb.find_all('p', {'class': 'item-description'})[0]
+        desc = ' '
+        for line in descr.contents:
+            if isinstance(line, bs4.element.NavigableString):
+                desc += ' ' + line.string.strip('<\br>').strip('\n')
+
+        # return resp_comb.find_all(
+        #     'ul', {'class': 'item-summary'})
+
         try:
             ars = int(resp_comb.find(
                 'div', {'class': 'item-geoloc'}).find('h2').string.split('e')[0][-2:])
         except:
             break
-            pieces = None
-            chambre = None
-            square_meters = None
+
+        # return resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('li')
+
+        # print(resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('li'))
+        temp_dict_ = {}
+        for lines in resp_comb.find_all('ul', {'class': 'item-summary'})[0].find_all('li'):
+            tag = lines.contents[0].split()[0]
+            value = int(lines.find_all('strong')[0].string.split()[0])
+            temp_dict_[tag] = value
 
         try:
-            pieces = int(resp_comb.find_all(
-                'ul', {'class': 'item-summary'})[0].find_all('strong')[0].string)
+            pieces = temp_dict_[u'Pi\xe8ces']
         except:
             pieces = None
         try:
-            chambre = int(resp_comb.find_all(
-                'ul', {'class': 'item-summary'})[0].find_all('strong')[1].string)
+            chambre = temp_dict_[u'Chambre']
         except:
             chambre = None
         try:
-            square_meters = int(resp_comb.find_all(
-                'ul', {'class': 'item-summary'})[0].find_all('strong')[2].string.split()[0])
+            square_meters = temp_dict_['Surface']
+
         except:
             square_meters = None
 
@@ -246,7 +259,7 @@ def extract_listings_pap(parsed):
             # 'link': link_href,                    # add this too
             # 'description': descr,            # and this
             'price': price,
-            'desc': None,
+            'desc': desc,
             'pieces': pieces,
             'meters': square_meters,
             'chambre': chambre,

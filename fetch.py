@@ -25,12 +25,31 @@ def fetch_pap():
     string[15] = '15e-g37782'
     string[13] = '13e-g37780'
     string[14] = '14e-g37781'
+    string[2] = '2e-g37769'
+    string[3] = '3e-g37770'
+    string[4] = '4e-g37771'
+    string[5] = '5e-g37772'
+    string[6] = '6e-g37773'
+    string[7] = '7e-g37774'
+    string[8] = '8e-g37775'
+    string[9] = '9e-g37776'
+    string[10] = '10e-g37777'
+    string[11] = '11e-g37778'
+    string[12] = '12e-g37779'
+    string[16] = '16e-g37783'
+    string[17] = '17e-g37784'
+    string[18] = '18e-g37785'
+    string[19] = '19e-g37786'
+    string[20] = '20e-g37787'
 
-    for i in [13, 14, 15]:
+
+
+
+    for i in np.arange(2,20):
         print(i)
         base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}'.format(string[i])
         try:
-            resp_ = requests.get(base2, timeout=15)
+            resp_ = requests.get(base2, timeout=20)
         except:
             break
         # resp_.raise_for_status()  # <- no-op if status==200
@@ -48,7 +67,7 @@ def fetch_pap():
                 string[i], j)
             try:
 
-                resp_ = requests.get(base2, timeout=10)
+                resp_ = requests.get(base2, timeout=20)
             except:
                 break
             # resp_.raise_for_status()  # <- no-op if status==200
@@ -189,7 +208,8 @@ def extract_listings_pap(parsed):
 
         ref = listing.find('div', {'class': 'float-right'}).find('a', href=True)['href']
         base = 'http://www.pap.fr/' + ref
-        resp = requests.get(base, timeout=10)
+        resp = requests.get(base, timeout=20)
+        link = base
         resp.raise_for_status()  # <- no-op if status==200
 
         resp_comb = parse_source(resp.content, resp.encoding)
@@ -266,7 +286,7 @@ def extract_listings_pap(parsed):
             'ars': ars,
             # 'meters': sqm,
             # 'beds': beds
-            'link': None
+            'link': link
         }
         extracted.append(SortedDict(this_listing))
     return extracted

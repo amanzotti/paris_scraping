@@ -23,24 +23,29 @@ def parse_source(html, encoding='utf-8'):
 
 def fetch_meilleursagents():
     base = 'http://www.meilleursagents.com/immobilier/recherche/?redirect_url=&view_mode=list&sort_mode=ma_contract%7Cdesc&transaction_type=369681778&buyer_search_id=&user_email=&place_ids%5B%5D=138724240&place_title=&item_types%5B%5D=369681781&item_types%5B%5D=369681782&item_area_min=&item_area_max=&budget_min=&budget_max='
-    resp = requests.get(base, timeout=15)
+
+    resp = requests.get(base, timeout=150)
     resp.raise_for_status()  # <- no-op if status==200
     parsed = parse_source(resp.content, resp.encoding)
 
 
-
 def fetch_solger():
     base = 'http://www.seloger.com/list.htm?idtt=1&idtypebien=1&cp=75&tri=initial'
-    resp = requests.get(base, timeout=15)
+    resp = requests.get(base, timeout=150)
     resp.raise_for_status()  # <- no-op if status==200
     parsed = parse_source(resp.content, resp.encoding)
 
 
 def fetch_pap():
     base = 'http://www.pap.fr/annonce/locations-appartement-paris-14e-g37781'
-    resp = requests.get(base, timeout=15)
-    resp.raise_for_status()  # <- no-op if status==200
-    resp_comb = resp.content
+    try:
+
+        resp = requests.get(base, timeout=150)
+        resp.raise_for_status()  # <- no-op if status==200
+        resp_comb = resp.content
+    except:
+        pass
+
     listing = []
     string = {}
     string[15] = '15e-g37782'
@@ -63,14 +68,11 @@ def fetch_pap():
     string[19] = '19e-g37786'
     string[20] = '20e-g37787'
 
-
-
-
-    for i in np.arange(2,20):
+    for i in np.arange(2, 20):
         print(i)
         base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}'.format(string[i])
         try:
-            resp_ = requests.get(base2, timeout=20)
+            resp_ = requests.get(base2, timeout=200)
         except:
             break
         # resp_.raise_for_status()  # <- no-op if status==200
@@ -87,8 +89,7 @@ def fetch_pap():
             base2 = 'http://www.pap.fr/annonce/locations-appartement-paris-{}-{}'.format(
                 string[i], j)
             try:
-
-                resp_ = requests.get(base2, timeout=20)
+                resp_ = requests.get(base2, timeout=200)
             except:
                 break
             # resp_.raise_for_status()  # <- no-op if status==200
@@ -105,15 +106,21 @@ def fetch_pap():
 def fetch_fusac():
     base = 'http://ads.fusac.fr/ad-category/housing/'
     listing = []
-    resp = requests.get(base, timeout=10)
-    resp.raise_for_status()  # <- no-op if status==200
-    resp_comb = resp.content
-    parsed = parse_source(resp.content, resp.encoding)
-    listing.append(extract_listings_fusac(parsed))
+    try:
+        resp = requests.get(base, timeout=100)
+        resp.raise_for_status()  # <- no-op if status==200
+        resp_comb = resp.content
+        parsed = parse_source(resp.content, resp.encoding)
+        listing.append(extract_listings_fusac(parsed))
+    except:
+        pass
 
     for i in np.arange(2, 6):
         base2 = 'http://ads.fusac.fr/ad-category/housing/housing-offers/page/{}/'.format(i)
-        resp_ = requests.get(base2, timeout=10)
+        try:
+            resp_ = requests.get(base2, timeout=100)
+        except:
+            continue
         # resp_.raise_for_status()  # <- no-op if status==200
         if resp_.status_code == 404:
             break
@@ -138,10 +145,13 @@ def fetch_search_results(
         raise ValueError("No valid keywords")
 
     base = 'https://paris.craigslist.fr/search/apa'
-    resp_ = requests.get(base, params=search_params, timeout=3)
-    resp_.raise_for_status()  # <- no-op if status==200
-    parsed = parse_source(resp_.content, resp_.encoding)
-    listing.append(extract_listings(parsed))
+    try:
+        resp_ = requests.get(base, params=search_params, timeout=100)
+        resp_.raise_for_status()  # <- no-op if status==200
+        parsed = parse_source(resp_.content, resp_.encoding)
+        listing.append(extract_listings(parsed))
+    except:
+        return None
     return listing
 
 
@@ -178,7 +188,7 @@ def extract_listings_fusac(parsed):
             desc = desc.string
 
         url = listing.find('div', {'class': "post-left"}).find('div', {'class': "grido"}).find('a', href=True).get('href')
-        resp = requests.get(url, timeout=20)
+        resp = requests.get(url, timeout=100)
         resp.raise_for_status()  # <- no-op if status==200
 
         parse = parse_source(resp.content, resp.encoding)
@@ -229,7 +239,10 @@ def extract_listings_pap(parsed):
 
         ref = listing.find('div', {'class': 'float-right'}).find('a', href=True)['href']
         base = 'http://www.pap.fr/' + ref
-        resp = requests.get(base, timeout=20)
+        try:
+            resp = requests.get(base, timeout=100)
+        except:
+            break
         link = base
         resp.raise_for_status()  # <- no-op if status==200
 
@@ -311,7 +324,6 @@ def extract_listings_pap(parsed):
         }
         extracted.append(SortedDict(this_listing))
     return extracted
-
 
 
 def extract_listings_solger(parsed):
